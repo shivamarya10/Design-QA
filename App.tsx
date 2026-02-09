@@ -2,86 +2,142 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { IssuesPanel } from './components/IssuesPanel';
 import { MainStage } from './components/MainStage';
-import { DesignError } from './types';
+import { DesignError, CanvasItem } from './types';
 
 function App() {
-  const [image, setImage] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [items, setItems] = useState<CanvasItem[]>([]);
   const [errors, setErrors] = useState<DesignError[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  
+  // Issue Selection State
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
 
-  // Clean up object URL to prevent memory leaks
+  // --- Keyboard Nav for Issues ---
   useEffect(() => {
-    return () => {
-      if (image) URL.revokeObjectURL(image);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only navigate errors if an item is selected
+      if (!selectedItemId) return;
+      const relevantErrors = errors.filter(err => err.itemId === selectedItemId);
+      if (relevantErrors.length === 0) return;
+
+      if (e.key === 'Escape') setSelectedIssueId(null);
+      
+      if (e.key === 'j' || e.key === 'ArrowRight') {
+        setSelectedIssueId(prev => {
+          if (!prev) return relevantErrors[0].id;
+          const idx = relevantErrors.findIndex(e => e.id === prev);
+          return relevantErrors[(idx + 1) % relevantErrors.length].id;
+        });
+      }
+      
+      if (e.key === 'k' || e.key === 'ArrowLeft') {
+        setSelectedIssueId(prev => {
+          if (!prev) return relevantErrors[relevantErrors.length - 1].id;
+          const idx = relevantErrors.findIndex(e => e.id === prev);
+          return relevantErrors[(idx - 1 + relevantErrors.length) % relevantErrors.length].id;
+        });
+      }
     };
-  }, [image]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [errors, selectedItemId]);
 
-  const handleImageUpload = (file: File) => {
-    const objectUrl = URL.createObjectURL(file);
-    setImage(objectUrl);
-    setErrors([]); // Clear previous errors
-    setIsScanning(true);
+  // --- File Upload & Auto-Positioning Logic ---
+  const handleFileUpload = (files: FileList) => {
+    Array.from(files).forEach((file, index) => {
+       if (!file.type.startsWith('image/')) return;
 
-    // Simulate AI scanning latency
-    setTimeout(() => {
-      setIsScanning(false);
-      // Generate some consistent mock errors based on the "Design System"
-      setErrors([
-        {
-          id: '1',
-          type: 'spacing',
-          message: 'Inconsistent padding. Expected 24px, found 20px.',
-          severity: 'low',
-          coordinates: { x: 15, y: 15, w: 20, h: 10 }
-        },
-        {
-          id: '2',
-          type: 'contrast',
-          message: 'Text contrast ratio is 3.5:1. WCAG AA requires 4.5:1.',
-          severity: 'high',
-          coordinates: { x: 45, y: 35, w: 30, h: 8 }
-        },
-        {
-          id: '3',
-          type: 'alignment',
-          message: 'Button is not aligned to the grid column.',
-          severity: 'low',
-          coordinates: { x: 70, y: 80, w: 15, h: 10 }
-        },
-        {
-          id: '4',
-          type: 'brand',
-          message: 'Primary color hex #6D28D9 deviates from brand guidelines.',
-          severity: 'high',
-          coordinates: { x: 40, y: 60, w: 20, h: 15 }
-        }
-      ]);
-    }, 2500);
+       const objectUrl = URL.createObjectURL(file);
+       const newItemId = `item-${Date.now()}-${index}`;
+       
+       // Auto-Position: Place to the right of the last item + gap
+       const gap = 50; 
+       const defaultWidth = 375; // Mobile Width assumption
+       const lastItem = items[items.length - 1];
+       const startX = lastItem ? lastItem.x + lastItem.width + gap : -200;
+       
+       // Create Item
+       const newItem: CanvasItem = {
+         id: newItemId,
+         type: 'image',
+         src: objectUrl,
+         x: startX,
+         y: -300, // Center vertically roughly
+         width: defaultWidth, 
+         height: 812, // Mobile Height assumption (real app would load image to get dims)
+         zIndex: items.length + 1,
+         isScanning: true
+       };
+
+       setItems(prev => [...prev, newItem]);
+       setSelectedItemId(newItemId); // Auto-focus new item
+
+       // --- Trigger Mock AI Scan ---
+       simulateAIScan(newItemId);
+    });
   };
 
-  const handleClearImage = () => {
-    setImage(null);
-    setErrors([]);
-    setIsScanning(false);
+  const simulateAIScan = (itemId: string) => {
+    setTimeout(() => {
+      // 1. Stop Scanning state
+      setItems(prev => prev.map(i => i.id === itemId ? { ...i, isScanning: false } : i));
+
+      // 2. Generate Random Mock Errors
+      const newErrors: DesignError[] = [
+        {
+          id: `err-${itemId}-1`,
+          itemId,
+          type: 'contrast',
+          message: 'Header text failed contrast check (3.5:1).',
+          severity: 'high',
+          coordinates: { x: 10, y: 5, w: 40, h: 5 }
+        },
+        {
+          id: `err-${itemId}-2`,
+          itemId,
+          type: 'spacing',
+          message: 'Inconsistent padding on card container.',
+          severity: 'low',
+          coordinates: { x: 5, y: 20, w: 90, h: 15 }
+        },
+        {
+          id: `err-${itemId}-3`,
+          itemId,
+          type: 'brand',
+          message: 'Detected hex #0000FF. Brand uses #3B82F6.',
+          severity: 'high',
+          coordinates: { x: 50, y: 80, w: 30, h: 8 }
+        }
+      ];
+
+      setErrors(prev => [...prev, ...newErrors]);
+    }, 2000);
   };
 
   return (
-    <div className="flex h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans selection:bg-purple-500/30">
+    <div className="w-full h-screen overflow-hidden bg-alabaster font-sans">
       <Sidebar />
+      
       <MainStage 
-        image={image}
-        onImageUpload={handleImageUpload}
-        onClearImage={handleClearImage}
-        isScanning={isScanning}
+        items={items}
+        onItemsChange={setItems}
         errors={errors}
         hoveredIssueId={hoveredIssueId}
         onHoverIssue={setHoveredIssueId}
+        selectedIssueId={selectedIssueId}
+        onSelectIssue={setSelectedIssueId}
+        selectedItemId={selectedItemId}
+        onSelectItem={setSelectedItemId}
+        onFileUpload={handleFileUpload}
       />
+
       <IssuesPanel 
         errors={errors} 
-        isScanning={isScanning}
         onHoverIssue={setHoveredIssueId}
+        selectedIssueId={selectedIssueId}
+        onSelectIssue={setSelectedIssueId}
+        selectedItemId={selectedItemId}
       />
     </div>
   );

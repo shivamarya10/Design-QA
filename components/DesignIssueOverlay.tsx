@@ -5,19 +5,26 @@ import { DesignError } from '../types';
 interface DesignIssueOverlayProps {
   error: DesignError;
   isHovered: boolean;
+  isSelected: boolean;
   onHover: (id: string | null) => void;
+  scale: number; // To keep stroke width consistent visually
 }
 
-export const DesignIssueOverlay: React.FC<DesignIssueOverlayProps> = ({ error, isHovered, onHover }) => {
+export const DesignIssueOverlay: React.FC<DesignIssueOverlayProps> = ({ error, isHovered, isSelected, onHover, scale }) => {
+  const isActive = isHovered || isSelected;
+
+  // Highlighter Colors
   const colors = {
-    spacing: { border: 'border-blue-500', text: 'text-blue-500', shadow: 'shadow-blue-500/50', bg: 'bg-blue-500' },
-    contrast: { border: 'border-orange-500', text: 'text-orange-500', shadow: 'shadow-orange-500/50', bg: 'bg-orange-500' },
-    brand: { border: 'border-red-500', text: 'text-red-500', shadow: 'shadow-red-500/50', bg: 'bg-red-500' },
-    alignment: { border: 'border-purple-500', text: 'text-purple-500', shadow: 'shadow-purple-500/50', bg: 'bg-purple-500' },
+    spacing: { border: 'border-blue-500', bg: 'bg-blue-500', text: 'text-blue-600', fill: 'bg-blue-500/10' }, 
+    contrast: { border: 'border-amber-500', bg: 'bg-amber-500', text: 'text-amber-600', fill: 'bg-amber-500/10' }, 
+    brand: { border: 'border-rose-500', bg: 'bg-rose-500', text: 'text-rose-600', fill: 'bg-rose-500/10' },     
+    alignment: { border: 'border-violet-500', bg: 'bg-violet-500', text: 'text-violet-600', fill: 'bg-violet-500/10' }, 
   };
 
   const style = colors[error.type] || colors.alignment;
-  const isRightSide = error.coordinates.x > 60; // Flip tooltip if on the right side
+  
+  // The "Sketchy" CSS Formula
+  const organicBorderRadius = '255px 15px 225px 15px / 15px 225px 15px 255px';
 
   return (
     <motion.div
@@ -30,49 +37,80 @@ export const DesignIssueOverlay: React.FC<DesignIssueOverlayProps> = ({ error, i
       }}
       onMouseEnter={() => onHover(error.id)}
       onMouseLeave={() => onHover(null)}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
     >
-      {/* Smart Reticles (Corner Brackets) */}
-      <div className={`absolute top-0 left-0 w-3 h-3 border-l-[2px] border-t-[2px] rounded-tl-[1px] transition-all duration-300 ${style.border} ${isHovered ? `shadow-[0_0_10px_0] ${style.shadow} opacity-100` : 'opacity-70'}`} />
-      <div className={`absolute top-0 right-0 w-3 h-3 border-r-[2px] border-t-[2px] rounded-tr-[1px] transition-all duration-300 ${style.border} ${isHovered ? `shadow-[0_0_10px_0] ${style.shadow} opacity-100` : 'opacity-70'}`} />
-      <div className={`absolute bottom-0 left-0 w-3 h-3 border-l-[2px] border-b-[2px] rounded-bl-[1px] transition-all duration-300 ${style.border} ${isHovered ? `shadow-[0_0_10px_0] ${style.shadow} opacity-100` : 'opacity-70'}`} />
-      <div className={`absolute bottom-0 right-0 w-3 h-3 border-r-[2px] border-b-[2px] rounded-br-[1px] transition-all duration-300 ${style.border} ${isHovered ? `shadow-[0_0_10px_0] ${style.shadow} opacity-100` : 'opacity-70'}`} />
+      {/* Hand-Drawn Box */}
+      <div 
+        className={`absolute inset-0 transition-all duration-300 border-2 ${style.border} ${isActive ? 'opacity-100' : 'opacity-60 hover:opacity-100'}`}
+        style={{
+            borderRadius: organicBorderRadius,
+            borderWidth: `${Math.max(2, 2.5 / scale)}px`, // Keep visible at low zoom
+            transform: 'rotate(-0.5deg)', // Slight imperfection
+            backgroundColor: isActive ? style.fill.replace('bg-', 'rgba(') : 'transparent', // Hacky tailwind conversion or just rely on css classes
+        }}
+      >
+        {/* Fill layer for hover */}
+        <div className={`absolute inset-0 w-full h-full ${style.fill} opacity-0 transition-opacity ${isActive ? '!opacity-100' : ''}`} style={{ borderRadius: organicBorderRadius }} />
+      </div>
+      
+      {/* Double Stroke Effect on Selection (Second offset box) */}
+      {isActive && (
+        <div 
+            className={`absolute inset-0 border-2 ${style.border} opacity-60 pointer-events-none`}
+            style={{
+                borderRadius: '15px 225px 15px 255px / 255px 15px 225px 15px', // Inverted formula
+                borderWidth: `${Math.max(2, 2 / scale)}px`,
+                transform: 'rotate(1deg) scale(1.02)',
+            }}
+        />
+      )}
 
-      {/* Invisible Interactive Zone */}
-      <div className="absolute inset-0 cursor-crosshair bg-transparent" />
+      {/* Invisible Click Zone */}
+      <div className="absolute inset-0 cursor-pointer bg-transparent" />
 
-      {/* Glassmorphic Tooltip */}
+      {/* "Comment Card" Popover */}
       <AnimatePresence>
-        {isHovered && (
+        {isActive && (
           <motion.div
-            initial={{ opacity: 0, x: isRightSide ? -10 : 10 }}
-            animate={{ opacity: 1, x: isRightSide ? -20 : 20 }}
-            exit={{ opacity: 0, x: isRightSide ? -10 : 10 }}
-            className={`absolute top-0 flex items-start z-50 ${isRightSide ? 'right-full flex-row-reverse' : 'left-full flex-row'}`}
-            style={{ marginTop: '-8px' }}
+            initial={{ opacity: 0, scale: 0.9, y: 5 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute left-[105%] top-0 z-50 flex items-start"
+            style={{ 
+                transformOrigin: 'top left',
+                // Counter-scale the popover so it says readable regardless of zoom
+                transform: `scale(${1/scale})` 
+            }}
           >
-            {/* Connector Line */}
-            <div className={`flex items-center h-8 ${isRightSide ? 'flex-row-reverse' : ''}`}>
-               <div className={`w-8 h-[1px] ${style.bg} opacity-50`} />
-               <div className={`w-1.5 h-1.5 rounded-full ${style.bg} shadow-sm ${isRightSide ? '-mr-0.5' : '-ml-0.5'}`} />
-            </div>
+            {/* Sketchy Line Connector */}
+            <div className={`w-8 h-[2px] mt-4 ${style.bg} opacity-50 absolute -left-8`} style={{ transform: 'rotate(-10deg)' }} />
 
-            {/* Tooltip Card */}
-            <div className={`
-              backdrop-blur-md bg-zinc-900/90 
-              border border-zinc-800
-              rounded-lg shadow-2xl 
-              p-3 min-w-[200px] max-w-[280px]
-              ${isRightSide ? 'mr-2' : 'ml-2'}
-            `}>
-              <div className="flex items-center gap-2 mb-1.5 border-b border-zinc-800/50 pb-1.5">
-                <div className={`w-2 h-2 rounded-full ${style.bg} shadow-sm`} />
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${style.text}`}>{error.type}</span>
+            {/* The Card */}
+            <div className="bg-white/95 backdrop-blur-xl rounded-xl shadow-xl border border-white/50 p-4 w-64 ring-1 ring-black/5">
+              <div className="flex items-center gap-2 mb-2">
+                 <div className={`w-2.5 h-2.5 rounded-full ${style.bg}`} />
+                 <span className={`text-[10px] font-bold font-display uppercase tracking-wider ${style.text}`}>
+                   {error.type}
+                 </span>
               </div>
-              <p className="text-xs text-zinc-300 leading-relaxed">
+              <h4 className="font-display font-bold text-charcoal text-base mb-1 leading-tight">
+                {error.type === 'spacing' ? 'Padding Inconsistency' : 
+                 error.type === 'contrast' ? 'Accessibility Risk' : 
+                 error.type === 'brand' ? 'Brand Violation' : 'Alignment Issue'}
+              </h4>
+              <p className="text-sm text-warmGrey leading-relaxed font-sans">
                 {error.message}
               </p>
+              
+              {/* Action Footer */}
+              <div className="mt-3 pt-3 border-t border-stone-100 flex justify-between items-center">
+                <button className="text-xs font-bold text-charcoal hover:underline">Fix this</button>
+                <div className="flex -space-x-1.5">
+                   <div className="w-5 h-5 rounded-full bg-blue-100 border border-white flex items-center justify-center text-[8px] text-blue-600 font-bold">JD</div>
+                   <div className="w-5 h-5 rounded-full bg-green-100 border border-white flex items-center justify-center text-[8px] text-green-600 font-bold">AI</div>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}

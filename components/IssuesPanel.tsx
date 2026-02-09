@@ -1,15 +1,31 @@
 import React from 'react';
 import { DesignError } from '../types';
-import { AlertTriangle, Ruler, Palette, Move, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Ruler, Palette, Move, CheckCircle2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface IssuesPanelProps {
   errors: DesignError[];
-  isScanning: boolean;
   onHoverIssue: (id: string | null) => void;
+  selectedIssueId: string | null;
+  onSelectIssue: (id: string | null) => void;
+  selectedItemId: string | null;
 }
 
-export const IssuesPanel: React.FC<IssuesPanelProps> = ({ errors, isScanning, onHoverIssue }) => {
+export const IssuesPanel: React.FC<IssuesPanelProps> = ({ 
+  errors, 
+  onHoverIssue, 
+  selectedIssueId, 
+  onSelectIssue,
+  selectedItemId
+}) => {
+  const [isOpen, setIsOpen] = React.useState(true);
+
+  // Filter errors based on selected item context
+  // If no item is selected, show nothing (or could show all, but context-aware is cleaner)
+  const displayErrors = selectedItemId 
+    ? errors.filter(e => e.itemId === selectedItemId)
+    : [];
+
   const getIcon = (type: DesignError['type']) => {
     switch (type) {
       case 'spacing': return <Ruler size={14} />;
@@ -19,85 +35,102 @@ export const IssuesPanel: React.FC<IssuesPanelProps> = ({ errors, isScanning, on
     }
   };
 
-  const getSeverityColor = (severity: 'low' | 'high') => {
-    return severity === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-  };
+  if (!selectedItemId) {
+      return null; // Don't show panel if no image is focused
+  }
+
+  if (!isOpen) {
+    return (
+      <button 
+        onClick={() => setIsOpen(true)}
+        className="fixed right-6 top-6 z-40 bg-white shadow-lg rounded-full p-3 border border-stone-100 hover:scale-105 transition-transform"
+      >
+        <AlertTriangle size={20} className="text-charcoal" />
+        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border border-white">
+          {displayErrors.length}
+        </span>
+      </button>
+    );
+  }
 
   return (
-    <aside className="w-80 bg-zinc-950 border-l border-zinc-800 flex flex-col shrink-0 h-screen">
-      <div className="p-6 border-b border-zinc-900">
-        <h2 className="text-zinc-100 font-semibold mb-1">Issues Found</h2>
-        <p className="text-xs text-zinc-500">
-          {isScanning ? 'Analyzing design...' : `${errors.length} issues detected`}
-        </p>
-      </div>
+    <aside className="fixed right-6 top-6 bottom-6 z-40 w-80 flex flex-col pointer-events-none">
+      <div className="pointer-events-auto bg-white/80 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex flex-col h-full overflow-hidden ring-1 ring-black/5">
+        
+        {/* Header */}
+        <div className="p-5 border-b border-stone-100 flex justify-between items-start bg-white/40">
+          <div>
+             <h2 className="text-charcoal font-display font-bold text-lg leading-none">Context Review</h2>
+             <p className="text-xs text-warmGrey mt-1 font-medium">
+               {displayErrors.length} issues on selected screen
+             </p>
+          </div>
+          <button onClick={() => setIsOpen(false)} className="text-stone-400 hover:text-charcoal transition-colors">
+            <X size={16} />
+          </button>
+        </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        <AnimatePresence mode="wait">
-          {isScanning ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center h-full text-zinc-600 gap-4"
-            >
-              <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm">Scanning pixels...</p>
-            </motion.div>
-          ) : errors.length === 0 ? (
-             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center h-full text-zinc-600 gap-4 text-center px-4"
-            >
-              <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center">
-                <CheckCircle2 size={24} className="text-zinc-700" />
+        {/* List */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          <AnimatePresence mode="wait">
+            {displayErrors.length === 0 ? (
+               <motion.div 
+                 initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                 className="flex flex-col items-center justify-center h-40 text-stone-400 gap-2 text-center"
+               >
+                 <CheckCircle2 size={24} className="text-green-500" />
+                 <p className="text-sm font-medium text-charcoal">All Clear!</p>
+               </motion.div>
+            ) : (
+              <div className="space-y-2">
+                 {displayErrors.map((error, index) => {
+                   const isSelected = selectedIssueId === error.id;
+                   
+                   return (
+                    <motion.div
+                      key={error.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => onSelectIssue(error.id)}
+                      onMouseEnter={() => onHoverIssue(error.id)}
+                      onMouseLeave={() => onHoverIssue(null)}
+                      className={`
+                        group p-3 rounded-xl border transition-all duration-200 cursor-pointer relative
+                        ${isSelected 
+                          ? 'bg-stone-50 border-charcoal shadow-md scale-[1.02]' 
+                          : 'bg-white border-stone-100 hover:border-stone-300 hover:shadow-sm'
+                        }
+                      `}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`
+                          mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0
+                          ${error.type === 'brand' ? 'bg-red-50 text-red-600' : 'bg-stone-100 text-charcoal'}
+                        `}>
+                          {getIcon(error.type)}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-charcoal uppercase tracking-wide mb-0.5">{error.type}</p>
+                          <p className="text-sm text-warmGrey leading-snug line-clamp-2">
+                            {error.message}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                 })}
               </div>
-              <div>
-                <p className="text-sm font-medium text-zinc-400">No issues found</p>
-                <p className="text-xs mt-1">Or no scan run yet. Drag an image to start.</p>
-              </div>
-            </motion.div>
-          ) : (
-            <div className="space-y-3">
-               {errors.map((error, index) => (
-                <motion.div
-                  key={error.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  onMouseEnter={() => onHoverIssue(error.id)}
-                  onMouseLeave={() => onHoverIssue(null)}
-                  className="group p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 hover:border-zinc-700 transition-all cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`p-1.5 rounded-md ${getSeverityColor(error.severity)}`}>
-                        {getIcon(error.type)}
-                      </span>
-                      <span className="text-xs font-medium text-zinc-300 capitalize">{error.type} Error</span>
-                    </div>
-                    {error.severity === 'high' && (
-                      <span className="text-[10px] uppercase font-bold text-red-500 tracking-wider">High</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors leading-relaxed">
-                    {error.message}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </AnimatePresence>
-      </div>
-      
-      <div className="p-4 border-t border-zinc-900 bg-zinc-950">
-        <button 
-          disabled={errors.length === 0 || isScanning}
-          className="w-full py-2.5 px-4 bg-zinc-100 text-zinc-950 font-medium text-sm rounded-md hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Export Report
-        </button>
+            )}
+          </AnimatePresence>
+        </div>
+        
+        {/* Footer */}
+        <div className="p-4 border-t border-stone-100 bg-white/40">
+          <button className="w-full py-2.5 bg-charcoal text-white font-display font-bold text-sm rounded-xl hover:bg-black transition-all shadow-lg shadow-black/10">
+            Export Feedback
+          </button>
+        </div>
       </div>
     </aside>
   );

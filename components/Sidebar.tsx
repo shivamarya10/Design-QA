@@ -1,69 +1,55 @@
 import React from 'react';
 import { 
-  LayoutGrid, 
-  Layers, 
-  Settings, 
-  LogOut, 
-  Plus, 
-  Box,
-  Zap
+  MousePointer2, 
+  Hand,
+  Type,
+  Square,
+  ImageIcon,
+  MoreHorizontal,
+  LayoutGrid
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   return (
-    <aside className="w-64 h-screen bg-zinc-950 border-r border-zinc-800 flex flex-col justify-between shrink-0">
-      <div className="p-6">
-        <div className="flex items-center gap-3 mb-8 text-zinc-100 font-semibold tracking-tight">
-          <div className="w-8 h-8 bg-purple-500/10 border border-purple-500/20 rounded-lg flex items-center justify-center text-purple-400">
-            <Zap size={18} fill="currentColor" />
-          </div>
-          Diff-Check
-        </div>
+    <aside className="fixed left-6 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-4 pointer-events-none">
+       {/* Main Tool Palette */}
+       <div className="pointer-events-auto bg-white/80 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-2 flex flex-col gap-2 w-14 items-center ring-1 ring-black/5">
+          <ToolButton icon={<MousePointer2 size={18} />} active label="Select" />
+          <ToolButton icon={<Hand size={18} />} label="Pan" />
+          <div className="w-8 h-px bg-stone-200/50" />
+          <ToolButton icon={<Square size={18} />} label="Shape" />
+          <ToolButton icon={<Type size={18} />} label="Text" />
+          <ToolButton icon={<ImageIcon size={18} />} label="Image" />
+          <div className="w-8 h-px bg-stone-200/50" />
+          <ToolButton icon={<MoreHorizontal size={18} />} label="More" />
+       </div>
 
-        <nav className="space-y-1">
-          <NavItem icon={<LayoutGrid size={18} />} label="Projects" active />
-          <NavItem icon={<Layers size={18} />} label="Queue" />
-          <NavItem icon={<Box size={18} />} label="Design System" />
-        </nav>
-
-        <div className="mt-8">
-          <div className="px-3 mb-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">
-            Recent Scans
+       {/* Project Info Pill */}
+       <div className="pointer-events-auto bg-white/80 backdrop-blur-xl rounded-full border border-white/60 shadow-sm py-2 px-3 flex items-center gap-2 absolute -left-0 -top-24 w-max ring-1 ring-black/5">
+          <div className="w-8 h-8 bg-charcoal rounded-full flex items-center justify-center text-white shadow-lg">
+             <LayoutGrid size={14} />
           </div>
-          <div className="space-y-1">
-            <ProjectItem name="Dashboard V2" time="2m ago" />
-            <ProjectItem name="Login Flow" time="1h ago" />
-            <ProjectItem name="Settings Page" time="3h ago" />
+          <div className="flex flex-col pr-2">
+             <span className="text-xs font-bold text-charcoal font-display">Diff-Check V3</span>
+             <span className="text-[10px] text-warmGrey">Infinite Canvas</span>
           </div>
-        </div>
-      </div>
-
-      <div className="p-4 border-t border-zinc-900">
-        <nav className="space-y-1">
-          <NavItem icon={<Settings size={18} />} label="Settings" />
-          <NavItem icon={<LogOut size={18} />} label="Log Out" />
-        </nav>
-      </div>
+       </div>
     </aside>
   );
 };
 
-const NavItem: React.FC<{ icon: React.ReactNode; label: string; active?: boolean }> = ({ icon, label, active }) => (
+const ToolButton: React.FC<{ icon: React.ReactNode; label: string; active?: boolean }> = ({ icon, label, active }) => (
   <button 
-    className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200
+    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200 group relative
       ${active 
-        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-        : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
+        ? 'bg-charcoal text-white shadow-lg shadow-black/20' 
+        : 'text-warmGrey hover:bg-stone-100 hover:text-charcoal'
       }`}
   >
     {icon}
-    {label}
-  </button>
-);
-
-const ProjectItem: React.FC<{ name: string; time: string }> = ({ name, time }) => (
-  <button className="w-full flex items-center justify-between px-3 py-2 text-sm text-zinc-400 rounded-md hover:bg-zinc-900 hover:text-zinc-100 transition-colors group">
-    <span className="truncate">{name}</span>
-    <span className="text-xs text-zinc-600 group-hover:text-zinc-500">{time}</span>
+    {/* Tooltip */}
+    <span className="absolute left-full ml-3 px-2 py-1 bg-charcoal text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+      {label}
+    </span>
   </button>
 );
